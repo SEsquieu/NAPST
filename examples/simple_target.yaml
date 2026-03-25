@@ -1,0 +1,11 @@
+name: local-model
+base_url: http://127.0.0.1:8000
+endpoint: /chat
+method: POST
+headers:
+  Content-Type: application/json
+body_template:
+  prompt: "{prompt}"
+response_json_path: response
+timeout: 20
+notes: Point this at a local dev wrapper or staging frontend.

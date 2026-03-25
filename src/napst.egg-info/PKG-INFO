@@ -1,0 +1,112 @@
+Metadata-Version: 2.4
+Name: napst
+Version: 0.2.0
+Summary: Behavioral probing and boundary inference for LLM and agentic systems
+Author: Seth Esquieu
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: typer>=0.12.3
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: pydantic>=2.7.1
+Requires-Dist: PyYAML>=6.0.1
+Requires-Dist: rich>=13.7.1
+Requires-Dist: jinja2>=3.1.4
+Requires-Dist: fastapi>=0.111.0
+Requires-Dist: uvicorn>=0.30.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.2.0; extra == "dev"
+
+# NAPST
+
+NAPST is a behavioral probing workbench for LLM and agentic systems.
+
+It does not try to prove architecture from thin air. It applies structured pressure, records how a target responds, and turns that into useful boundary inference for builders and security-minded teams.
+
+## Design shape
+
+- `napst_core`: headless engine, scenarios, inference, reporting
+- `napst_cli`: operator surface for local use and automation
+- `napst_ui`: thin local browser layer over saved artifacts
+
+## What it does today
+
+- Runs scenario packs against HTTP JSON model frontends
+- Stores repeatable run artifacts locally in `.napst/`
+- Infers behavioral findings from response drift and sequence behavior
+- Generates a human-readable HTML report
+- Keeps the UI separate from the engine so the project can grow cleanly
+
+## What it is not
+
+- Not a jailbreak toy
+- Not an offensive automation kit
+- Not a substitute for internal tracing
+
+It is a safe starting point for adversarial evaluation and boundary mapping.
+
+## Quickstart
+
+```bash
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e .
+napst scenarios
+napst run examples/simple_target.yaml --scenario boundary_baseline
+```
+
+Artifacts land in `.napst/runs/<run_id>/`.
+
+Open the report:
+
+```bash
+open .napst/runs/run_0001/report.html
+```
+
+## Example target config
+
+```yaml
+name: local-model
+base_url: http://127.0.0.1:8000
+endpoint: /chat
+method: POST
+headers:
+  Content-Type: application/json
+body_template:
+  prompt: "{prompt}"
+response_json_path: response
+timeout: 20
+```
+
+The tool expects `{prompt}` to be substituted into the request body. `response_json_path` is optional and can point into nested JSON like `choices.0.message.content`.
+
+## CLI
+
+```bash
+napst scenarios
+napst run examples/simple_target.yaml --scenario boundary_baseline
+napst run examples/simple_target.yaml --scenario persistence_probe
+napst list-runs
+napst show run_0001
+napst serve
+```
+
+## Scenario packs
+
+Current built-ins:
+
+- `boundary_baseline`
+- `persistence_probe`
+- `action_pressure`
+
+These are intentionally conservative. They probe response behavior and inferred trust boundaries rather than trying to weaponize edge cases.
+
+## Recommended next extension
+
+If you have access to internal traces, build gray-box adapters for:
+
+- retrieval events
+- tool calls
+- memory reads/writes
+- model routing metadata
+
+That turns NAPST from behavioral inference into higher-confidence causal mapping.
