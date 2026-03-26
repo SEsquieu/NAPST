@@ -32,11 +32,14 @@ class ArtifactStore:
         items = []
         for path in sorted(self.runs_dir.glob("run_*")):
             data = json.loads((path / "run.json").read_text())
+            hypotheses = data.get("hypotheses", [])
+            findings = data.get("findings", [])
             items.append({
                 "run_id": data["run_id"],
                 "target_name": data["target_name"],
                 "scenario": data["scenario"],
                 "created_at": data["created_at"],
-                "finding_count": len(data.get("findings", [])),
+                "finding_count": len(findings),
+                "hypothesis_count": len(hypotheses),
             })
         return items

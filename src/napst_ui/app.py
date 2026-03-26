@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
@@ -12,13 +14,16 @@ app = FastAPI(title="NAPST UI")
 def home() -> str:
     rows = ArtifactStore().list_runs()
     items = "".join(
-        f"<li><a href='/runs/{row['run_id']}'>{row['run_id']}</a> - {row['target_name']} - {row['scenario']} ({row['finding_count']} findings)</li>"
+        (
+            f"<li><a href='/runs/{row['run_id']}'>{row['run_id']}</a> - {row['target_name']} - "
+            f"{row['scenario']} ({row['hypothesis_count']} hypotheses)</li>"
+        )
         for row in rows
     ) or "<li>No runs yet</li>"
     return f"""
-    <html><body style='font-family: Arial; margin: 2rem'>
+    <html><body style='font-family: Segoe UI, Arial; margin: 2rem'>
       <h1>NAPST local UI</h1>
-      <p>Lightweight browser sugar over saved artifacts.</p>
+      <p>Lightweight browser sugar over saved mapping artifacts.</p>
       <ul>{items}</ul>
     </body></html>
     """
@@ -27,17 +32,22 @@ def home() -> str:
 @app.get("/runs/{run_id}", response_class=HTMLResponse)
 def run_view(run_id: str) -> str:
     data = ArtifactStore().load_run(run_id)
-    findings = "".join(
-        f"<li><strong>{f['title']}</strong> ({f['severity']}): {f['observation']}</li>" for f in data.get("findings", [])
-    ) or "<li>No findings</li>"
+    hypotheses = "".join(
+        (
+            f"<li><strong>{hypothesis['title']}</strong> "
+            f"({hypothesis['confidence']['bucket']} {hypothesis['confidence']['score']:.2f}): "
+            f"{hypothesis['statement']}</li>"
+        )
+        for hypothesis in data.get("hypotheses", [])
+    ) or "<li>No hypotheses</li>"
     return f"""
-    <html><body style='font-family: Arial; margin: 2rem'>
+    <html><body style='font-family: Segoe UI, Arial; margin: 2rem'>
       <h1>{data['run_id']}</h1>
       <p>Target: {data['target_name']} · Scenario: {data['scenario']}</p>
       <h2>Summary</h2>
-      <pre>{data['summary']}</pre>
-      <h2>Findings</h2>
-      <ul>{findings}</ul>
+      <pre>{json.dumps(data['summary'], indent=2)}</pre>
+      <h2>Hypotheses</h2>
+      <ul>{hypotheses}</ul>
       <p><a href='/'>Back</a></p>
     </body></html>
     """

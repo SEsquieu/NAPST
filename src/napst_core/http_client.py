@@ -40,8 +40,8 @@ class TargetInvoker:
                     return str(payload[key])
         return str(payload)
 
-    def invoke(self, probe: Probe) -> ProbeResult:
-        url = f"{self.target.base_url.rstrip('/')}" + f"/{self.target.endpoint.lstrip('/')}"
+    def invoke(self, probe: Probe, trial_index: int, sequence_index: int) -> ProbeResult:
+        url = f"{self.target.base_url.rstrip('/')}/{self.target.endpoint.lstrip('/')}"
         body = self._render(self.target.body_template, probe.prompt)
         with httpx.Client(timeout=self.target.timeout) as client:
             try:
@@ -66,6 +66,8 @@ class TargetInvoker:
                     latency_ms=round(latency_ms, 2),
                     response_text=text,
                     tags=probe.tags,
+                    trial_index=trial_index,
+                    sequence_index=sequence_index,
                     expected_signal=probe.expected_signal,
                     metadata=probe.metadata,
                 )
@@ -77,6 +79,8 @@ class TargetInvoker:
                     latency_ms=0.0,
                     response_text="",
                     tags=probe.tags,
+                    trial_index=trial_index,
+                    sequence_index=sequence_index,
                     expected_signal=probe.expected_signal,
                     metadata=probe.metadata,
                     error=str(exc),

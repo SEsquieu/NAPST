@@ -1,2 +1,0 @@
-[console_scripts]
-napst = napst_cli.main:app
