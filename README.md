@@ -160,3 +160,7 @@ The explicit `--basetemp` and disabled cache provider make test runs more reliab
 NAPST is being developed into a broader security evaluation suite. The first major goal is a robust mapper that estimates likely internal structure through a narrow frontend view while keeping evidence, confidence, and uncertainty visible.
 
 See [docs/architecture.md](docs/architecture.md) for the architecture and [docs/roadmap.md](docs/roadmap.md) for the staged plan.
+
+## Next Logical Step
+
+The current run path is shaped correctly for real reachable HTTP JSON frontends. The next practical hardening step is better session-faithful execution for targets that rely on sticky state, cookies, or longer-lived client context. That will make persistence and statefulness estimates more trustworthy on legitimate agent frontends.
