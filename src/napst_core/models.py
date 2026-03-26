@@ -4,9 +4,10 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 ConfidenceBucket = Literal["very_low", "low", "medium", "high", "very_high"]
@@ -14,14 +15,54 @@ ConfidenceBucket = Literal["very_low", "low", "medium", "high", "very_high"]
 
 class TargetConfig(BaseModel):
     name: str
-    base_url: str
-    endpoint: str
+    type: Literal["http_json", "browser_chat"] = "http_json"
+    base_url: str | None = None
+    endpoint: str | None = None
     method: Literal["GET", "POST"] = "POST"
     headers: dict[str, str] = Field(default_factory=dict)
     body_template: dict[str, Any] = Field(default_factory=lambda: {"prompt": "{prompt}"})
     timeout: float = 20.0
     response_json_path: str | None = None
+    start_url: str | None = None
+    origin_allowlist: list[str] = Field(default_factory=list)
+    storage_state_path: str | None = None
+    prompt_input_selector: str | None = None
+    send_button_selector: str | None = None
+    submit_on_enter: bool = True
+    response_container_selector: str | None = None
+    ready_selector: str | None = None
+    typing_indicator_selector: str | None = None
+    wait_timeout_seconds: float = 20.0
+    inter_probe_delay_seconds: float = 0.75
     notes: str | None = None
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> "TargetConfig":
+        if self.type == "http_json":
+            if not self.base_url or not self.endpoint:
+                raise ValueError("http_json targets require base_url and endpoint")
+            return self
+
+        required_browser_fields = {
+            "start_url": self.start_url,
+            "storage_state_path": self.storage_state_path,
+            "prompt_input_selector": self.prompt_input_selector,
+            "response_container_selector": self.response_container_selector,
+        }
+        missing = sorted(name for name, value in required_browser_fields.items() if not value)
+        if missing:
+            raise ValueError(
+                "browser_chat targets require " + ", ".join(missing)
+            )
+        if not self.submit_on_enter and not self.send_button_selector:
+            raise ValueError("browser_chat targets require send_button_selector when submit_on_enter is false")
+        if self.origin_allowlist:
+            return self
+        parsed = urlparse(self.start_url or "")
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError("browser_chat targets require a valid start_url")
+        self.origin_allowlist = [f"{parsed.scheme}://{parsed.netloc}"]
+        return self
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "TargetConfig":

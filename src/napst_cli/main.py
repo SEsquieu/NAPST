@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from napst_core import NapstRunner, TargetConfig
+from napst_core.capture import capture_browser_target, infer_name_from_url
 from napst_core.scenarios import list_scenarios
 from napst_core.storage import ArtifactStore
 
@@ -42,6 +43,51 @@ def run(target_file: str, scenario: str = typer.Option("map_core", help="Scenari
         )
     console.print_json(json.dumps(result.summary))
     console.print(f"Report: .napst/runs/{result.run_id}/report.html")
+
+
+@app.command()
+def capture(
+    url: str,
+    name: str | None = typer.Option(None, help="Target profile name"),
+    output_root: str = typer.Option(".napst", help="Root directory for saved target artifacts"),
+) -> None:
+    """Capture a reusable browser target profile for a chat frontend."""
+    chosen_name = name or infer_name_from_url(url)
+    console.print(f"Preparing browser capture for [bold]{chosen_name}[/bold] at [cyan]{url}[/cyan]")
+    console.print("A browser window will open. Log in normally, navigate to the chat surface, then return here.")
+    typer.confirm("Ready to launch the browser capture flow?", abort=True)
+    prompt_input_selector = typer.prompt("Prompt input selector", default="textarea")
+    response_container_selector = typer.prompt("Response container selector", default="[data-message-role='assistant']")
+    submit_on_enter = typer.confirm("Submit prompts by pressing Enter?", default=True)
+    send_button_selector = None
+    if not submit_on_enter:
+        send_button_selector = typer.prompt("Send button selector")
+    ready_selector = typer.prompt("Ready selector (optional)", default="", show_default=False) or None
+    typing_indicator_selector = (
+        typer.prompt("Typing indicator selector (optional)", default="", show_default=False) or None
+    )
+    console.print("The browser will stay open long enough for you to authenticate before saving storage state.")
+    target_file, storage_state = capture_browser_target(
+        url=url,
+        name=chosen_name,
+        prompt_input_selector=prompt_input_selector,
+        response_container_selector=response_container_selector,
+        send_button_selector=send_button_selector,
+        submit_on_enter=submit_on_enter,
+        ready_selector=ready_selector,
+        typing_indicator_selector=typing_indicator_selector,
+        wait_timeout_seconds=20.0,
+        inter_probe_delay_seconds=0.75,
+        before_save_callback=lambda: typer.confirm(
+            "After you log in and confirm the chat surface is ready, save the session state?",
+            default=True,
+            abort=True,
+        ),
+        root=output_root,
+    )
+    console.print(f"Saved target profile: {target_file}")
+    console.print(f"Saved storage state: {storage_state}")
+    console.print(f"Run with: napst run {target_file} --scenario map_core")
 
 
 @app.command("list-runs")

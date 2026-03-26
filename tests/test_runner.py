@@ -9,6 +9,18 @@ from napst_core.storage import ArtifactStore
 class FakeInvoker:
     def __init__(self, target: TargetConfig):
         self.target = target
+        self.started_trials: list[int] = []
+        self.ended_trials: list[int] = []
+        self.closed = False
+
+    def start_trial(self, trial_index: int) -> None:
+        self.started_trials.append(trial_index)
+
+    def end_trial(self, trial_index: int) -> None:
+        self.ended_trials.append(trial_index)
+
+    def close(self) -> None:
+        self.closed = True
 
     def invoke(self, probe, trial_index: int, sequence_index: int) -> ProbeResult:
         response_text = f"{probe.name} response"
@@ -49,7 +61,7 @@ def test_runner_produces_mapping_artifacts():
     try:
         shutil.rmtree(temp_dir, ignore_errors=True)
         store = ArtifactStore(temp_dir / ".napst")
-        runner = NapstRunner(store=store, invoker_cls=FakeInvoker)
+        runner = NapstRunner(store=store, transport_factory=lambda target: FakeInvoker(target))
         target = TargetConfig(name="demo", base_url="http://localhost:8000", endpoint="/chat")
 
         run = runner.run(target, "map_core")
@@ -62,3 +74,15 @@ def test_runner_produces_mapping_artifacts():
         assert (temp_dir / ".napst" / "runs" / run.run_id / "report.html").exists()
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def test_runner_resets_transport_between_trials():
+    transport = FakeInvoker(TargetConfig(name="demo", base_url="http://localhost:8000", endpoint="/chat"))
+    runner = NapstRunner(transport_factory=lambda target: transport)
+
+    run = runner.run(TargetConfig(name="demo", base_url="http://localhost:8000", endpoint="/chat"), "persistence_probe")
+
+    assert run.summary["trial_count"] == 2
+    assert transport.started_trials == [1, 2]
+    assert transport.ended_trials == [1, 2]
+    assert transport.closed is True

@@ -7,6 +7,7 @@ It interacts with a frontend, applies structured probe sequences, and reports bo
 ## What NAPST Does
 
 - Sends repeatable probe scenarios to an HTTP JSON model or agent frontend
+- Can drive a configured browser chat frontend using Playwright and a captured analyst session
 - Extracts evidence signals from the responses
 - Scores bounded hypotheses such as likely session state, soft instruction layering, tool-aware posture, retrieval hints, or possible routing variance
 - Writes local run artifacts and an HTML report for review
@@ -22,7 +23,7 @@ It interacts with a frontend, applies structured probe sequences, and reports bo
 
 The current milestone is a single-run black-box mapper.
 
-- Target type: HTTP JSON frontends
+- Target type: HTTP JSON frontends and single-surface browser chat frontends
 - Primary scenario: `map_core`
 - Primary outputs: CLI summary, JSON artifacts, HTML report
 - Confidence model: numeric score plus `very_low` / `low` / `medium` / `high` / `very_high`
@@ -49,6 +50,12 @@ Install NAPST:
 pip install -e .
 ```
 
+Install Playwright browsers if you want to use browser-backed targets:
+
+```bash
+playwright install
+```
+
 Install dev dependencies if you want to run tests:
 
 ```bash
@@ -56,6 +63,8 @@ pip install -e .[dev]
 ```
 
 ## Quickstart
+
+HTTP JSON flow:
 
 1. Point NAPST at a frontend that accepts HTTP JSON requests.
 2. Update [`examples/simple_target.yaml`](examples/simple_target.yaml) for your target.
@@ -72,6 +81,25 @@ napst run examples/simple_target.yaml --scenario map_core
 ```
 
 5. Review the generated artifacts in `.napst/runs/<run_id>/`.
+
+Browser frontend flow:
+
+```bash
+napst capture https://target.example.com/chat
+napst run .napst/targets/<captured-name>/target.yaml --scenario map_core
+```
+
+The capture flow opens a browser window, lets the analyst authenticate normally, and saves:
+
+- a reusable Playwright storage state
+- a browser target profile with the chat selectors you confirmed
+
+The CLI currently asks for:
+
+- the prompt input selector
+- the assistant response container selector
+- whether submit happens on `Enter` or a send button
+- optional ready and typing-indicator selectors
 
 Open the HTML report:
 
@@ -90,6 +118,7 @@ Invoke-Item .napst/runs/run_0001/report.html
 
 ```yaml
 name: local-model
+type: http_json
 base_url: http://127.0.0.1:8000
 endpoint: /chat
 method: POST
@@ -104,11 +133,33 @@ notes: Point this at a local dev wrapper or staging frontend.
 
 `{prompt}` is substituted into the request body before the request is sent. `response_json_path` is optional and can point into nested JSON such as `choices.0.message.content`.
 
+## Example Browser Target Config
+
+```yaml
+name: example-chat
+type: browser_chat
+start_url: https://target.example.com/chat
+origin_allowlist:
+  - https://target.example.com
+storage_state_path: .napst/targets/example-chat/storage_state.json
+prompt_input_selector: textarea
+submit_on_enter: true
+response_container_selector: "[data-message-role='assistant']"
+ready_selector: textarea
+typing_indicator_selector: .typing-indicator
+wait_timeout_seconds: 20
+inter_probe_delay_seconds: 0.75
+notes: Frontend-observed black-box browser target captured for NAPST.
+```
+
+Use `submit_on_enter: false` plus `send_button_selector` when the UI requires clicking a send control.
+
 ## CLI
 
 ```bash
 napst scenarios
 napst run examples/simple_target.yaml --scenario map_core
+napst capture https://target.example.com/chat
 napst list-runs
 napst show run_0001
 napst serve
@@ -161,6 +212,11 @@ NAPST is being developed into a broader security evaluation suite. The first maj
 
 See [docs/architecture.md](docs/architecture.md) for the architecture and [docs/roadmap.md](docs/roadmap.md) for the staged plan.
 
-## Next Logical Step
+## Browser Target Notes
 
-The current run path is shaped correctly for real reachable HTTP JSON frontends. The next practical hardening step is better session-faithful execution for targets that rely on sticky state, cookies, or longer-lived client context. That will make persistence and statefulness estimates more trustworthy on legitimate agent frontends.
+Browser-backed targets are intentionally narrow in v1:
+
+- one known chat surface
+- analyst-authenticated session reuse via saved Playwright storage state
+- no autonomous crawling or multi-page workflows
+- conservative interaction limited to configured chat selectors on an allowlisted origin

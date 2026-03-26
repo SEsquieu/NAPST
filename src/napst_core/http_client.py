@@ -7,9 +7,18 @@ import httpx
 from .models import Probe, ProbeResult, TargetConfig
 
 
-class TargetInvoker:
+class HttpJsonTransport:
     def __init__(self, target: TargetConfig):
         self.target = target
+
+    def start_trial(self, trial_index: int) -> None:
+        return None
+
+    def end_trial(self, trial_index: int) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
 
     def _render(self, value: Any, prompt: str) -> Any:
         if isinstance(value, str):
@@ -41,7 +50,9 @@ class TargetInvoker:
         return str(payload)
 
     def invoke(self, probe: Probe, trial_index: int, sequence_index: int) -> ProbeResult:
-        url = f"{self.target.base_url.rstrip('/')}/{self.target.endpoint.lstrip('/')}"
+        base_url = self.target.base_url or ""
+        endpoint = self.target.endpoint or ""
+        url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
         body = self._render(self.target.body_template, probe.prompt)
         with httpx.Client(timeout=self.target.timeout) as client:
             try:
@@ -85,3 +96,6 @@ class TargetInvoker:
                     metadata=probe.metadata,
                     error=str(exc),
                 )
+
+
+TargetInvoker = HttpJsonTransport
